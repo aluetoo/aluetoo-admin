@@ -45,4 +45,4 @@ Dans le dépôt GitHub : **Settings → Pages → Deploy from a branch → main 
 - Ne place jamais une clé `sb_secret_...`, `service_role`, un mot de passe ou une clé Groq dans ce dépôt.
 - Le code d'un site GitHub Pages est public et téléchargeable. La connexion admin protège les données, pas le code source.
 - Les RPC bonus et bannissement vérifient le rôle administrateur dans la base.
-- Le site Aluetoo Mobile doit encore appliquer les bannissements et les quotas côté serveur avant chaque appel au modèle IA. L'interface admin seule ne peut pas imposer ces règles à l'API IA.
+- Le backend Aluetoo Mobile utilise maintenant une Edge Function Supabase et une table de quotas privée pour vérifier les bannissements et les limites côté serveur avant chaque appel au modèle IA. La clé Groq doit être configurée comme secret Edge Function `GROQ_API_KEY` et l'ancienne clé exposée doit être révoquée.
