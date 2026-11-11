@@ -116,7 +116,7 @@
     let controls = [];
     if (ids.length) {
       const result = await client.from("user_controls")
-        .select("user_id,bonus_messages,is_banned,banned_reason").in("user_id", ids);
+        .select("user_id,bonus_messages,is_banned").in("user_id", ids);
       if (result.error) throw result.error;
       controls = result.data || [];
     }
