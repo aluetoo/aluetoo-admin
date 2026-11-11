@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090d18">
+  <title>Aluetoo AI — Administration</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#090d18;--panel:#111827;--panel2:#172033;--line:#263249;--txt:#eef3ff;--muted:#9ba9c2;--blue:#6c8cff;--green:#35c995;--red:#ff687d}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#182443 0,#090d18 55%);color:var(--txt);font:15px/1.5 Inter,system-ui,Segoe UI,Arial,sans-serif;min-height:100vh}
+    button,input{font:inherit}button{border:0;border-radius:10px;padding:10px 14px;background:var(--blue);color:white;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
+    button.secondary{background:#29364e}button.danger{background:#a9364b}button.success{background:#147d61}
+    input{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:#0c1423;color:var(--txt);outline:none}input:focus{border-color:var(--blue)}
+    .wrap{max-width:1180px;margin:auto;padding:28px 18px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:25px}
+    .brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#648cff,#9b6cff);display:grid;place-items:center;font-weight:900;font-size:20px}
+    h1{font-size:22px;margin:0}h2{font-size:17px;margin:0 0 15px}.muted{color:var(--muted)}.small{font-size:12px;color:var(--muted)}
+    .panel{background:linear-gradient(180deg,rgba(23,32,51,.96),rgba(17,24,39,.96));border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 12px 40px #0003}
+    .login{max-width:420px;margin:8vh auto}.stack{display:grid;gap:12px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.between{justify-content:space-between}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:16px 0}.stat{padding:16px;border-radius:13px;background:#0c1423;border:1px solid var(--line)}.stat strong{font-size:25px;display:block}
+    .layout{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}.toolbar{display:flex;gap:9px;margin-bottom:14px}.toolbar input{flex:1}
+    .tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:620px}th,td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);vertical-align:middle}th{font-size:12px;color:var(--muted);font-weight:700}
+    .pill{display:inline-block;padding:3px 8px;border-radius:30px;font-size:11px;background:#263650;color:#cbd8f5}.pill.admin{background:#45356d}.pill.banned{background:#642b3b;color:#ffd9df}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}.actions button{padding:7px 9px;font-size:12px}.notice{padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:#0c1423;color:var(--muted);margin:12px 0}
+    .hidden{display:none!important}#status{min-height:22px;color:#b9c9e8}.error{color:#ff9eac!important}.ok{color:#79e3bc!important}
+    @media(max-width:850px){.layout{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="logo">A</div><div><h1>Aluetoo AI <span class="muted">/ Admin</span></h1><div class="small">Espace de gestion sécurisé</div></div></div>
+    <button id="logout" class="secondary hidden">Se déconnecter</button>
+  </header>
+
+  <section id="loginPanel" class="panel login">
+    <h2>Connexion administrateur</h2>
+    <p class="muted">Connecte-toi avec un compte créé dans Supabase Auth et autorisé comme administrateur.</p>
+    <form id="loginForm" class="stack">
+      <label>Adresse e-mail<input id="email" type="email" autocomplete="username" required></label>
+      <label>Mot de passe<input id="password" type="password" autocomplete="current-password" required></label>
+      <button id="loginBtn" type="submit">Se connecter</button>
+    </form>
+    <p id="loginStatus" role="status"></p>
+  </section>
+
+  <main id="dashboard" class="hidden">
+    <div class="row between"><div><h2>Vue d'ensemble</h2><div class="muted small" id="adminEmail"></div></div><button id="refresh" class="secondary">Actualiser</button></div>
+    <div class="grid">
+      <div class="stat"><span class="muted small">Utilisateurs chargés</span><strong id="userCount">—</strong></div>
+      <div class="stat"><span class="muted small">Comptes bannis</span><strong id="bannedCount">—</strong></div>
+      <div class="stat"><span class="muted small">Administrateurs</span><strong id="adminCount">—</strong></div>
+    </div>
+    <div class="layout">
+      <section class="panel">
+        <div class="row between"><h2>Utilisateurs</h2><span class="pill">Gestion des comptes</span></div>
+        <div class="toolbar"><input id="search" placeholder="Rechercher par e-mail ou identifiant…"><button id="searchBtn">Rechercher</button></div>
+        <div class="tablewrap"><table><thead><tr><th>Compte</th><th>Rôle</th><th>Bonus</th><th>État</th><th>Actions</th></tr></thead><tbody id="usersBody"><tr><td colspan="5" class="muted">Chargement…</td></tr></tbody></table></div>
+        <p class="small">Les actions sensibles sont exécutées par des fonctions SQL contrôlées côté Supabase, pas uniquement par cette page.</p>
+      </section>
+      <aside class="stack">
+        <section class="panel">
+          <h2>Ajouter 5 messages gratuits</h2>
+          <p class="muted small">Saisis l'identifiant UUID du compte cible. Le bonus est ajouté par la fonction sécurisée.</p>
+          <form id="bonusForm" class="stack"><input id="bonusUserId" placeholder="UUID de l'utilisateur" required><button type="submit">Ajouter 5 messages</button></form>
+        </section>
+        <section class="panel">
+          <h2>Journal administrateur</h2>
+          <div id="audit" class="small muted">Chargement du journal…</div>
+        </section>
+      </aside>
+    </div>
+    <div id="status" role="status" aria-live="polite"></div>
+    <div class="notice">Les annonces, notifications et événements ne sont pas encore activés dans cette première version : il faut d'abord confirmer les colonnes exactes de tes tables Supabase pour éviter d'écrire dans le mauvais format.</div>
+  </main>
+</div>
+
+<script>
+(() => {
+  // Utilise uniquement la clé publishable/anon publique. Jamais de service_role dans le navigateur.
+  const SUPABASE_URL = "https://zhvigqisuhycinaszuht.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "COLLE_ICI_TA_CLE_PUBLISHABLE";
+  const $ = (id) => document.getElementById(id);
+  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  let currentUser = null;
+
+  function message(target, text, kind="") {
+    $(target).textContent = text;
+    $(target).className = kind;
+  }
+  function status(text, kind="") { message("status", text, kind); }
+  function safe(value) {
+    return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  async function verifyAdmin(user) {
+    const { data, error } = await client.from("profiles").select("role").eq("id", user.id).single();
+    if (error) throw error;
+    if (data?.role !== "admin") throw new Error("Ce compte n'a pas le rôle administrateur.");
+  }
+  async function showDashboard(user) {
+    await verifyAdmin(user);
+    currentUser = user;
+    $("loginPanel").classList.add("hidden");
+    $("dashboard").classList.remove("hidden");
+    $("logout").classList.remove("hidden");
+    $("adminEmail").textContent = user.email || "Administrateur connecté";
+    await loadUsers();
+    await loadAudit();
+  }
+  async function loadUsers() {
+    $("usersBody").innerHTML = '<tr><td colspan="5" class="muted">Chargement…</td></tr>';
+    const { data: profiles, error } = await client.from("profiles")
+      .select("id,email,role,created_at").order("created_at", {ascending:false}).limit(200);
+    if (error) throw error;
+    const ids = (profiles || []).map(p => p.id);
+    let controls = [];
+    if (ids.length) {
+      const result = await client.from("user_controls")
+        .select("user_id,bonus_messages,is_banned,banned_reason").in("user_id", ids);
+      if (result.error) throw result.error;
+      controls = result.data || [];
+    }
+    const byId = new Map(controls.map(c => [c.user_id,c]));
+    const rows = (profiles || []).map(p => {
+      const c = byId.get(p.id) || {};
+      const banned = !!c.is_banned;
+      return `<tr>
+        <td><strong>${safe(p.email || "E-mail indisponible")}</strong><div class="small">${safe(p.id)}</div></td>
+        <td><span class="pill ${p.role === "admin" ? "admin" : ""}">${safe(p.role || "user")}</span></td>
+        <td>${Number(c.bonus_messages || 0)}</td>
+        <td>${banned ? '<span class="pill banned">Banni</span>' : '<span class="pill">Actif</span>'}</td>
+        <td><div class="actions">
+          <button class="secondary" data-bonus="${safe(p.id)}">+5 bonus</button>
+          ${banned ? `<button class="success" data-unban="${safe(p.id)}">Débannir</button>` : `<button class="danger" data-ban="${safe(p.id)}">Bannir</button>`}
+        </div></td></tr>`;
+    }).join("");
+    $("usersBody").innerHTML = rows || '<tr><td colspan="5" class="muted">Aucun utilisateur trouvé.</td></tr>';
+    $("userCount").textContent = profiles.length;
+    $("bannedCount").textContent = controls.filter(c => c.is_banned).length;
+    $("adminCount").textContent = profiles.filter(p => p.role === "admin").length;
+  }
+  async function loadAudit() {
+    const { data, error } = await client.from("admin_audit_log")
+      .select("action,target_user_id,created_at").order("created_at",{ascending:false}).limit(8);
+    if (error) { $("audit").textContent = "Journal indisponible : " + error.message; return; }
+    $("audit").innerHTML = (data || []).map(x =>
+      `<div style="padding:8px 0;border-bottom:1px solid #263249"><strong>${safe(x.action)}</strong><br><span>${safe(x.target_user_id || "—")} · ${safe(new Date(x.created_at).toLocaleString("fr-FR"))}</span></div>`
+    ).join("") || "Aucune action enregistrée.";
+  }
+  async function addBonus(userId) {
+    const { error } = await client.rpc("aluetoo_admin_add_bonus", { target_user_id: userId, amount: 5 });
+    if (error) throw error;
+    status("5 messages bonus ajoutés.", "ok");
+    await loadUsers(); await loadAudit();
+  }
+  async function setBan(userId, banned) {
+    const reason = banned ? (prompt("Motif du bannissement (facultatif) :") || "") : "";
+    const { error } = await client.rpc("aluetoo_admin_set_ban", {
+      target_user_id: userId, should_ban: banned, reason: reason
+    });
+    if (error) throw error;
+    status(banned ? "Compte banni." : "Compte débanni.", "ok");
+    await loadUsers(); await loadAudit();
+  }
+
+  $("loginForm").addEventListener("submit", async e => {
+    e.preventDefault(); $("loginBtn").disabled = true;
+    try {
+      const { data, error } = await client.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+      if (error) throw error;
+      await showDashboard(data.user);
+      message("loginStatus", "");
+    } catch(err) { message("loginStatus", err.message, "error"); }
+    finally { $("loginBtn").disabled = false; }
+  });
+  $("logout").addEventListener("click", async () => {
+    await client.auth.signOut(); currentUser=null;
+    $("dashboard").classList.add("hidden"); $("loginPanel").classList.remove("hidden"); $("logout").classList.add("hidden");
+    status("");
+  });
+  $("refresh").addEventListener("click", async () => { try { await loadUsers(); await loadAudit(); status("Données actualisées.","ok"); } catch(e){status(e.message,"error");} });
+  $("searchBtn").addEventListener("click", async () => {
+    const q = $("search").value.trim();
+    if (!q) return loadUsers();
+    try {
+      const {data,error}=await client.from("profiles").select("id,email,role,created_at")
+        .or(`email.ilike.%${q}%,id.eq.${q}`).limit(100);
+      if(error) throw error;
+      const ids=(data||[]).map(p=>p.id);
+      const cr=ids.length?await client.from("user_controls").select("user_id,bonus_messages,is_banned").in("user_id",ids):{data:[]};
+      if(cr.error) throw cr.error;
+      const map=new Map((cr.data||[]).map(c=>[c.user_id,c]));
+      $("usersBody").innerHTML=(data||[]).map(p=>{
+        const c=map.get(p.id)||{}, banned=!!c.is_banned;
+        return `<tr><td><strong>${safe(p.email||"E-mail indisponible")}</strong><div class="small">${safe(p.id)}</div></td><td><span class="pill">${safe(p.role||"user")}</span></td><td>${Number(c.bonus_messages||0)}</td><td>${banned?'<span class="pill banned">Banni</span>':'<span class="pill">Actif</span>'}</td><td><div class="actions"><button class="secondary" data-bonus="${safe(p.id)}">+5 bonus</button>${banned?`<button class="success" data-unban="${safe(p.id)}">Débannir</button>`:`<button class="danger" data-ban="${safe(p.id)}">Bannir</button>`}</div></td></tr>`;
+      }).join("")||'<tr><td colspan="5">Aucun résultat.</td></tr>';
+    } catch(e){status(e.message,"error");}
+  });
+  $("usersBody").addEventListener("click", async e => {
+    const b=e.target.closest("button"); if(!b)return;
+    try {
+      if(b.dataset.bonus) await addBonus(b.dataset.bonus);
+      if(b.dataset.ban) await setBan(b.dataset.ban,true);
+      if(b.dataset.unban) await setBan(b.dataset.unban,false);
+    } catch(err){status(err.message,"error");}
+  });
+  $("bonusForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    try { await addBonus($("bonusUserId").value.trim()); $("bonusUserId").value=""; }
+    catch(err){status(err.message,"error");}
+  });
+  client.auth.getSession().then(async ({data}) => {
+    if(data.session) {
+      try { await showDashboard(data.session.user); }
+      catch(e){ await client.auth.signOut(); message("loginStatus",e.message,"error"); }
+    }
+  });
+})();
+</script>
+</body>
+</html>
