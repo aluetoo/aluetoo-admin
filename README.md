@@ -1,44 +1,48 @@
 # Aluetoo Admin
 
-Tableau de bord d'administration statique hébergé sur GitHub Pages et connecté à Supabase.
+Tableau de bord d'administration statique hébergé sur GitHub Pages et connecté au projet Supabase existant.
 
-## Fichiers
+## Fonctionnalités actuelles
 
-- `index.html` : interface admin (utilisateurs, bonus, bannissements, annonces, notifications, événements, paramètres et journal).
-- `supabase/migrations/001_core_admin.sql` : profils, contrôles de compte, journal, fonctions SQL et politiques RLS.
-- `supabase/migrations/002_admin_content_and_settings.sql` : annonces, notifications, événements et paramètres.
+- Connexion via Supabase Auth, avec vérification du rôle `profiles.role = 'admin'`.
+- Liste des profils et état des comptes.
+- Ajout de 5 messages bonus et bannissement/débannissement via les RPC SQL existantes.
+- Création, activation/désactivation et suppression des annonces.
+- Création, activation/désactivation et suppression des événements.
+- Consultation du journal administrateur.
 
-## Installation Supabase
+## Schéma Supabase utilisé
 
-1. Ouvre le SQL Editor du projet.
-2. Fais d'abord un export/backup des données.
-3. Exécute `001_core_admin.sql`, puis `002_admin_content_and_settings.sql`.
-4. Vérifie qu'un compte utilisateur existe dans Supabase Auth.
-5. Attribue le rôle admin manuellement depuis le SQL Editor, en remplaçant l'adresse ci-dessous par l'adresse du compte administrateur :
+Le tableau de bord utilise les tables déjà présentes dans le projet :
 
-```sql
-update public.profiles
-set role = 'admin'
-where id = (
-  select id from auth.users
-  where email = 'TON-EMAIL-DE-COMPTE'
-);
-```
+- `profiles` : `id, email, role, created_at`
+- `user_controls` : `user_id, bonus_messages, is_banned, ban_reason`
+- `admin_audit_log` : `admin_id, target_user_id, action, details, created_at`
+- `announcements` : `title, content, is_active, priority, expires_at`
+- `events` : `title, description, start_date, end_date, is_active, type`
 
-Ne donne jamais le rôle admin via un formulaire public. Vérifie que la requête modifie exactement une ligne.
+Les RPC utilisées sont `aluetoo_admin_add_bonus(p_user_id, p_amount, p_reason)` et `aluetoo_admin_set_ban(p_user_id, p_banned, p_reason)`.
 
-## GitHub Pages
+## Base de données
 
-Dans le dépôt GitHub : Settings → Pages → Deploy from a branch → main → /(root). Attends la fin du déploiement.
+La base existante a été inspectée avant adaptation. Les brouillons de migrations initialement présents dans ce dépôt ont été retirés car ils créaient des tables de contenu différentes de celles du projet réel.
 
-## Sécurité importante
+Le seul fichier de migration conservé dans ce dépôt est :
 
-- La clé `sb_publishable_...` est une clé publique. Elle peut être présente dans le navigateur si RLS est correctement configuré.
+- `supabase/migrations/001_admin_manage_existing_content.sql`
+
+Il ajoute des politiques RLS réservant les opérations d'écriture sur `announcements` et `events` aux administrateurs. Cette politique a déjà été appliquée au projet connecté. Ne la réexécute pas manuellement sans vérifier l'historique des migrations.
+
+**Aucune table, aucun compte et aucune donnée existante n'ont été supprimés.**
+
+## Déploiement GitHub Pages
+
+Dans le dépôt GitHub : **Settings → Pages → Deploy from a branch → main → /(root)**. Attends la fin du déploiement.
+
+## Sécurité
+
+- La clé Supabase publishable est publique par conception. La sécurité des données dépend de Supabase Auth, des permissions SQL et des politiques RLS.
 - Ne place jamais une clé `sb_secret_...`, `service_role`, un mot de passe ou une clé Groq dans ce dépôt.
-- Le code HTML et JavaScript d'un site GitHub Pages est téléchargeable par les visiteurs. La connexion admin protège les données grâce à Supabase Auth et RLS, mais ne rend pas le code source privé.
-- Les fonctions SQL sécurisent les opérations bonus et bannissement. Pour que le bannissement et les quotas aient un effet sur les réponses IA, le backend du site Aluetoo Mobile doit contrôler `user_controls` avant de traiter chaque demande.
-- Les tables de contenu sont nouvelles et préfixées `aluetoo_`. La migration n'efface aucune ancienne table.
-
-## Attention
-
-Ces migrations sont conçues pour être additives et répétables, mais teste-les d'abord sur une sauvegarde ou un projet de test. Ne supprime pas tes tables existantes pour installer ce tableau de bord.
+- Le code d'un site GitHub Pages est public et téléchargeable. La connexion admin protège les données, pas le code source.
+- Les RPC bonus et bannissement vérifient le rôle administrateur dans la base.
+- Le site Aluetoo Mobile doit encore appliquer les bannissements et les quotas côté serveur avant chaque appel au modèle IA. L'interface admin seule ne peut pas imposer ces règles à l'API IA.
